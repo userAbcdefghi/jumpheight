@@ -1,0 +1,685 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0d2a33"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style></head><body>
+<title>Kite Airtime</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow logbook column — record card on top, flight-path chart, jump list, then setup notes. Readable in sun (Atkinson). */
+:root {
+  --bg: #eef3f4;
+  --surface: #ffffff;
+  --ink: #0d2a33;
+  --muted: #5a7279;
+  --line: #d3dfe2;
+  --accent: #d6336c;      /* kite canopy */
+  --sea: #1b7f8c;         /* water line, baro */
+  --sky: #cfe6ea;
+  --ok: #1f8a4c;
+  --warn: #b26a00;
+  --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a1a1f; --surface: #10262d; --ink: #e3f0f2; --muted: #8fa9af; --line: #21414a;
+    --accent: #ff5c8f; --sea: #4cc3cf; --sky: #133740; --ok: #4fcf86; --warn: #f0a53a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a1a1f; --surface: #10262d; --ink: #e3f0f2; --muted: #8fa9af; --line: #21414a;
+  --accent: #ff5c8f; --sea: #4cc3cf; --sky: #133740; --ok: #4fcf86; --warn: #f0a53a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 24px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 28px; }
+header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(28px, 6vw, 40px); letter-spacing: -0.02em; margin: 0; line-height: 1; }
+h1 span { color: var(--accent); }
+h2 { font-family: var(--f-display); font-weight: 800; font-size: 20px; margin: 0; text-wrap: balance; }
+.tag { color: var(--muted); margin: 0; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 700; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.record { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: end;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+.big { font-family: var(--f-display); font-weight: 800; font-size: clamp(64px, 16vw, 112px); line-height: 0.9; letter-spacing: -0.04em; }
+.big small { font-size: 0.32em; letter-spacing: 0; color: var(--muted); font-weight: 500; margin-left: 4px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.stat b { display: block; font-family: var(--f-mono); font-size: 20px; font-weight: 600; }
+.stat span { font-size: 12px; color: var(--muted); }
+.source { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.pill { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.demo { color: var(--warn); border-color: currentColor; }
+.pill.live { color: var(--accent); border-color: currentColor; }
+.pill.file { color: var(--sea); border-color: currentColor; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+button, .filebtn { font: 700 15px var(--f-body); padding: 12px 18px; border-radius: 10px; border: 1.5px solid var(--ink);
+  background: transparent; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:hover, .filebtn:hover { filter: brightness(1.08); }
+button:focus-visible, .filebtn:focus-within, input:focus-visible, summary:focus-visible { outline: 3px solid var(--sea); outline-offset: 2px; }
+.filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.msg { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--sky); font-size: 14px; }
+.msg.err { border-left: 4px solid var(--warn); }
+
+.live { background: var(--ink); color: var(--bg); border-radius: 14px; padding: 22px; display: grid; gap: 16px; }
+.live .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: end; }
+.live .state { font-family: var(--f-display); font-size: 32px; font-weight: 800; }
+.live .state.air { color: var(--accent); }
+.live .k { font-size: 12px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.08em; }
+.live .v { font-family: var(--f-mono); font-size: 28px; font-weight: 600; }
+.live button { border-color: var(--bg); color: var(--bg); }
+.live label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+
+.chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 10px; display: grid; gap: 8px; }
+.chartbox canvas { width: 100%; height: 260px; display: block; touch-action: pan-y; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td.r, th.r { text-align: right; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--sky); }
+tbody tr.sel { background: var(--sky); box-shadow: inset 3px 0 0 var(--accent); }
+.hbar { display: inline-block; height: 8px; border-radius: 4px; background: var(--accent); vertical-align: middle; margin-right: 8px; }
+.empty { color: var(--muted); padding: 16px 0; }
+
+.detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.detail .stat b { font-size: 22px; }
+
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px 18px; }
+summary { cursor: pointer; font-weight: 700; padding: 12px 0; }
+details > div { padding-bottom: 16px; display: grid; gap: 12px; max-width: 65ch; }
+details p, details li { margin: 0; }
+details ul, details ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.setting { display: grid; gap: 4px; }
+.setting label { font-weight: 700; display: flex; justify-content: space-between; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+code { font-family: var(--f-mono); font-size: 0.88em; background: var(--sky); padding: 1px 5px; border-radius: 4px; }
+
+@media (max-width: 560px) {
+  .record { grid-template-columns: minmax(0, 1fr); }
+  .chartbox canvas { height: 220px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Kite<span>·</span>Airtime</h1>
+    <p class="tag">Sprunghöhe aus den Bewegungssensoren deines Handys</p>
+  </header>
+
+  <section class="record" aria-label="Zusammenfassung">
+    <div>
+      <div class="eyebrow">Höchster Sprung</div>
+      <div class="big num" id="best">–<small>m</small></div>
+      <div class="source"><span class="pill" id="srcPill">–</span><span class="tag" id="srcText"></span></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sCount">–</b><span>Sprünge</span></div>
+      <div class="stat"><b id="sAvg">–</b><span>Ø Höhe (m)</span></div>
+      <div class="stat"><b id="sAir">–</b><span>max. Airtime (s)</span></div>
+    </div>
+  </section>
+
+  <section class="actions" aria-label="Datenquelle">
+    <button class="primary" id="btnLive" type="button">Live messen</button>
+    <label class="filebtn">Aufzeichnung importieren
+      <input type="file" id="fileIn" accept=".csv,.txt,text/csv" multiple></label>
+    <button id="btnDemo" type="button">Beispiel-Session</button>
+  </section>
+  <p class="msg" id="msg" hidden></p>
+
+  <section class="live" id="livePanel" hidden aria-live="polite">
+    <div class="row">
+      <div><div class="k">Status</div><div class="state" id="lState">Auf dem Wasser</div></div>
+      <div><div class="k">Gefühlte Last</div><div class="v" id="lG">1.00 g</div></div>
+      <div><div class="k">Airtime</div><div class="v" id="lAir">0.0 s</div></div>
+      <div><div class="k">Letzter Sprung</div><div class="v" id="lLast">–</div></div>
+    </div>
+    <div class="row">
+      <button id="btnStop" type="button">Stopp</button>
+      <button id="btnCsv" type="button">Rohdaten als CSV</button>
+      <label><input type="checkbox" id="speak" checked> Höhe nach der Landung ansagen</label>
+    </div>
+  </section>
+
+  <section class="chartbox" aria-label="Flugbahnen">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
+      <h2>Flugbahnen</h2><span class="tag" style="font-size:13px">Tippe auf einen Sprung</span>
+    </div>
+    <canvas id="chart" role="img" aria-label="Rekonstruierte Höhe über der Zeit"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>Höhe (Beschleunigung)</span>
+      <span id="lgBaro"><i style="background:var(--sea)"></i>Barometer</span>
+      <span><i style="background:var(--muted)"></i>Gefühlte Last in g</span>
+    </div>
+  </section>
+
+  <section class="detail" id="detail" hidden aria-live="polite"></section>
+
+  <section aria-label="Sprungliste" style="display:grid;gap:10px">
+    <h2>Sprünge</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>Zeit</th><th class="r">Airtime</th><th>Höhe</th><th class="r">Barometer</th><th>Methode</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <details>
+    <summary>Erkennung einstellen</summary>
+    <div>
+      <div class="setting">
+        <label for="thr">Schwelle «in der Luft» <span class="num" id="thrV"></span></label>
+        <input type="range" id="thr" min="0.3" max="0.85" step="0.05" value="0.6">
+        <span class="tag" style="font-size:13px">Unter dieser gefühlten Last gilt man als abgehoben. Höher = mehr Sprünge mit viel Kite-Zug erkannt, aber auch mehr Fehlalarme in Kabbelwasser.</span>
+      </div>
+      <div class="setting">
+        <label for="minAir">Minimale Airtime <span class="num" id="minAirV"></span></label>
+        <input type="range" id="minAir" min="0.3" max="2" step="0.1" value="0.6">
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>So misst die App</summary>
+    <div>
+      <ol>
+        <li><b>Abheben erkennen.</b> Auf dem Brett spürst du rund 1 g oder mehr. In der Luft hält dich nur noch der Kite, die gefühlte Last fällt deutlich ab. Dieses Fenster zwischen Absprung-Spitze und Landeschlag ist die Airtime.</li>
+        <li><b>Höhe rechnen.</b> Das Handy liefert pro Messpunkt die Richtung der Schwerkraft, auch wenn du dich drehst. Die App integriert die senkrechte Beschleunigung zweimal und setzt Start und Landung auf Wasserhöhe. So zählt der Auftrieb des Kites automatisch mit.</li>
+        <li><b>Ohne Lagedaten</b> (nur Gesamtbeschleunigung) schätzt die App mit <code>h = (g − Kite-Zug) · t² / 8</code>. Die reine Wurfparabel <code>g · t² / 8</code> würde bei Kite-Sprüngen viel zu hoch liegen.</li>
+        <li><b>Barometer</b> (nur beim Import, z.&nbsp;B. aus Sensor Logger) wird separat angezeigt. Es misst direkt, rauscht aber um etwa ±0.5 m und reagiert auf Böen am Handy.</li>
+      </ol>
+      <p><b>Live messen</b> braucht Zugriff auf die Bewegungssensoren. In der Claude-Vorschau sind die gesperrt. Öffne dafür die Datei <code>index.html</code> über HTTPS, zum Beispiel via GitHub Pages, und füge sie zum Home-Bildschirm hinzu.</p>
+      <p><b>Import:</b> Mit der App <i>Sensor Logger</i> (iOS/Android) die Sensoren <i>Accelerometer</i>, <i>Gravity</i> und <i>Barometer</i> mit 50&nbsp;Hz oder mehr aufzeichnen und die CSV-Dateien gemeinsam auswählen. <i>phyphox</i> («Beschleunigung mit g») und die CSV aus dem Live-Modus gehen auch.</p>
+      <p><b>Befestigung:</b> Handy in einer wasserdichten Hülle straff am Körper tragen, idealerweise in der Prallschutzweste oder am Trapez. Lose am Arm verfälscht die Landung.</p>
+      <p><b>Genauigkeit:</b> Rechne mit etwa ±10–20&nbsp;%. Board-Ride-Wertungen nutzen eigene Sensoren und eigene Formeln, die Zahlen sind nicht direkt vergleichbar.</p>
+    </div>
+  </details>
+</div>
+
+<script>
+(() => {
+const G = 9.80665;
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 1) => v == null || !isFinite(v) ? '–' : v.toLocaleString('de-CH', { minimumFractionDigits: d, maximumFractionDigits: d });
+const opts = { thr: 0.6, minAir: 0.6 };
+let rec = null, jumps = [], sel = -1, source = { kind: 'demo', text: '' };
+
+/* ---------- Analyse ---------- */
+// rec: { t:[s], fx,fy,fz: specific force incl. gravity [m/s²], gx,gy,gz: gravity vector (optional), alt: altitude [m] (optional) }
+function analyze(r) {
+  const n = r.t.length, t = r.t;
+  if (n < 20) return { jumps: [], mag: [], aUp: null, zAll: new Float32Array(n), baro: null };
+  const mag = new Float32Array(n);
+  for (let i = 0; i < n; i++) mag[i] = Math.hypot(r.fx[i], r.fy[i], r.fz[i]);
+  const dtMed = median(diffs(t, 200)) || 0.02;
+  const sm = movAvg(mag, Math.max(1, Math.round(0.08 / dtMed)));
+
+  // vertical linear acceleration, rotation-robust via per-sample gravity direction
+  let aUp = null;
+  if (r.gx) {
+    const proj = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const gm = Math.hypot(r.gx[i], r.gy[i], r.gz[i]) || 1;
+      proj[i] = (r.fx[i] * r.gx[i] + r.fy[i] * r.gy[i] + r.fz[i] * r.gz[i]) / gm;
+    }
+    const s = median(Array.from(proj.filter((_, i) => i % 7 === 0))) < 0 ? -1 : 1;
+    aUp = new Float32Array(n);
+    for (let i = 0; i < n; i++) aUp[i] = s * proj[i] - G;
+  }
+  const baro = r.alt ? movAvg(r.alt, Math.max(1, Math.round(0.8 / dtMed))) : null;
+
+  // airborne segments
+  const segs = [];
+  let start = -1;
+  for (let i = 0; i < n; i++) {
+    const air = sm[i] < opts.thr * G;
+    if (air && start < 0) start = i;
+    if ((!air || i === n - 1) && start >= 0) { segs.push([start, i]); start = -1; }
+  }
+  const merged = [];
+  for (const sg of segs) {
+    const last = merged[merged.length - 1];
+    if (last && t[sg[0]] - t[last[1]] < 0.2) last[1] = sg[1]; else merged.push(sg.slice());
+  }
+
+  const out = [], zAll = new Float32Array(n);
+  for (const [s, e] of merged) {
+    const T = t[e] - t[s];
+    if (T < opts.minAir || T > 15) continue;
+    const landPk = maxIn(mag, t, t[e], t[e] + 0.7);
+    const popPk = maxIn(mag, t, t[s] - 1.0, t[s]);
+    if (landPk < 1.3 * G || popPk < 1.1 * G) continue;   // no clear take-off/landing -> chop or crash
+
+    let fbar = 0; for (let i = s; i <= e; i++) fbar += mag[i]; fbar /= (e - s + 1);
+    const hKite = Math.max(0, G - fbar) * T * T / 8;
+    const hBall = G * T * T / 8;
+
+    let hInt = null, traj = null;
+    if (aUp) {
+      const zs = [0]; let z = 0, v = 0;
+      for (let i = s + 1; i <= e; i++) {
+        const dt = t[i] - t[i - 1], a = (aUp[i] + aUp[i - 1]) / 2;
+        z += v * dt + 0.5 * a * dt * dt; v += a * dt; zs.push(z);
+      }
+      const v0 = -zs[zs.length - 1] / T;
+      traj = zs.map((zz, k) => zz + v0 * (t[s + k] - t[s]));
+      hInt = Math.max(...traj);
+      if (!(hInt > 0 && hInt < 40)) { hInt = null; traj = null; }
+    }
+    let hBaro = null;
+    if (baro) {
+      const pre = sliceVals(baro, t, t[s] - 3, t[s] - 0.6), post = sliceVals(baro, t, t[e] + 0.8, t[e] + 3);
+      const base = median(pre.concat(post));
+      const peak = Math.max(...sliceVals(baro, t, t[s], t[e] + 0.3));
+      if (isFinite(base) && isFinite(peak)) hBaro = Math.max(0, peak - base);
+    }
+    let rot = null;
+    if (r.gx) {
+      rot = 0;
+      for (let i = s + 1; i <= e; i++) {
+        const a = [r.gx[i - 1], r.gy[i - 1], r.gz[i - 1]], b = [r.gx[i], r.gy[i], r.gz[i]];
+        const c = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / ((Math.hypot(...a) * Math.hypot(...b)) || 1);
+        rot += Math.acos(Math.min(1, Math.max(-1, c)));
+      }
+      rot = rot * 180 / Math.PI;
+    }
+    const h = hInt ?? hKite;
+    if (traj) traj.forEach((zz, k) => zAll[s + k] = Math.max(0, zz));
+    else for (let i = s; i <= e; i++) { const u = (t[i] - t[s]) / T; zAll[i] = 4 * h * u * (1 - u); }
+    out.push({ s, e, t0: t[s], T, h, hInt, hKite, hBall, hBaro, fbar: fbar / G, popPk: popPk / G, landPk: landPk / G, rot, method: hInt != null ? 'Integration' : 'Airtime + Kite-Zug' });
+  }
+  return { jumps: out, mag, zAll, baro, aUp };
+}
+
+function diffs(t, k) { const d = []; for (let i = 1; i < Math.min(t.length, k); i++) d.push(t[i] - t[i - 1]); return d; }
+function median(a) { if (!a.length) return NaN; const b = Array.from(a).sort((x, y) => x - y); return b[b.length >> 1]; }
+function movAvg(a, w) {
+  const n = a.length, o = new Float32Array(n); let acc = 0; const h = w >> 1;
+  const pre = new Float64Array(n + 1); for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + a[i];
+  for (let i = 0; i < n; i++) { const lo = Math.max(0, i - h), hi = Math.min(n, i + h + 1); o[i] = (pre[hi] - pre[lo]) / (hi - lo); }
+  return o;
+}
+function idxAt(t, x) { let lo = 0, hi = t.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (t[m] < x) lo = m + 1; else hi = m; } return lo; }
+function maxIn(a, t, x0, x1) { let m = -Infinity; for (let i = idxAt(t, x0); i < t.length && t[i] <= x1; i++) m = Math.max(m, a[i]); return m; }
+function sliceVals(a, t, x0, x1) { const o = []; for (let i = idxAt(t, x0); i < t.length && t[i] <= x1; i++) o.push(a[i]); return o; }
+
+/* ---------- Beispiel-Session (synthetisch) ---------- */
+function makeDemo() {
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const gauss = () => { let s = 0; for (let k = 0; k < 6; k++) s += rnd(); return s - 3; };
+  const hz = 50, dur = 80, n = hz * dur;
+  const plan = [{ t: 11, h: 3.4, k: 2.6, spin: 0 }, { t: 26, h: 7.1, k: 3.4, spin: 0 }, { t: 44, h: 11.8, k: 4.2, spin: 1 }, { t: 63, h: 5.2, k: 3.0, spin: 0 }]
+    .map(j => { const ge = G - j.k, v0 = Math.sqrt(2 * j.h * ge); return { ...j, v0, T: 2 * v0 / ge }; });
+  const R = { t: [], fx: [], fy: [], fz: [], gx: [], gy: [], gz: [], alt: [] };
+  let drift = 0, gust = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / hz;
+    let aUp = 1.6 * Math.sin(2 * Math.PI * 1.3 * t) + 0.9 * gauss(), hx = 3 + 0.8 * gauss(), hy = 0.6 * gauss(), z = 0, theta = 0.35 * Math.sin(0.5 * t);
+    for (const j of plan) {
+      const dt = t - j.t;
+      if (dt > -0.4 && dt < 0) { aUp = j.v0 / 0.4 + 1.2 * gauss(); hx = 5; }
+      else if (dt >= 0 && dt <= j.T) { aUp = j.k - G + 0.35 * gauss(); hx = 1 + 0.3 * gauss(); z = j.v0 * dt - (G - j.k) / 2 * dt * dt; theta += j.spin * 2 * Math.PI * dt / j.T; }
+      else if (dt > j.T && dt < j.T + 0.3) { aUp = j.v0 / 0.3 + 2 * gauss(); }
+    }
+    const fw = [hx, hy, aUp + G], gw = [0, 0, G], c = Math.cos(theta), s = Math.sin(theta);
+    const rot = v => [v[0], v[1] * c + v[2] * s, -v[1] * s + v[2] * c];
+    const fd = rot(fw), gd = rot(gw);
+    drift += 0.0004 * gauss(); gust = 0.97 * gust + 0.08 * gauss();
+    R.t.push(t); R.fx.push(fd[0]); R.fy.push(fd[1]); R.fz.push(fd[2]); R.gx.push(gd[0]); R.gy.push(gd[1]); R.gz.push(gd[2]);
+    R.alt.push(z + drift + gust + 0.3 * gauss());
+  }
+  return R;
+}
+
+/* ---------- CSV-Import ---------- */
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const h0 = lines[0];
+  const delim = (h0.match(/\t/g) || []).length ? '\t' : (h0.match(/;/g) || []).length > (h0.match(/,/g) || []).length ? ';' : ',';
+  const split = l => l.split(delim).map(x => x.trim().replace(/^"|"$/g, ''));
+  const header = split(h0).map(x => x.toLowerCase());
+  const cols = header.map(() => []);
+  for (let i = 1; i < lines.length; i++) {
+    const p = split(lines[i]);
+    if (p.length < header.length) continue;
+    for (let j = 0; j < header.length; j++) cols[j].push(parseFloat(delim === ',' ? p[j] : p[j].replace(',', '.')));
+  }
+  return { header, cols };
+}
+function findAxis(header, a, prefix = '') {
+  const re = new RegExp(`(^|[^a-z])${prefix}${a}([^a-z]|$)`);
+  return header.findIndex(h => re.test(h));
+}
+function timeCol(header, cols) {
+  let j = header.indexOf('seconds_elapsed');
+  if (j < 0) j = header.findIndex(h => /time|zeit|^t$/.test(h));
+  if (j < 0) return null;
+  const raw = cols[j], d = median(diffs(raw, 300));
+  const k = d > 1e5 ? 1e-9 : d > 0.5 ? 1e-3 : 1;
+  return raw.map(v => v * k);
+}
+function vecStream(f, prefix = '') {
+  const ix = findAxis(f.header, 'x', prefix), iy = findAxis(f.header, 'y', prefix), iz = findAxis(f.header, 'z', prefix);
+  if (ix < 0 || iy < 0 || iz < 0) return null;
+  return { x: f.cols[ix], y: f.cols[iy], z: f.cols[iz] };
+}
+function interp(ts, vs, td) {
+  const o = new Float64Array(td.length); let k = 0;
+  for (let i = 0; i < td.length; i++) {
+    while (k < ts.length - 2 && ts[k + 1] < td[i]) k++;
+    const span = ts[k + 1] - ts[k], u = span > 0 ? Math.min(1, Math.max(0, (td[i] - ts[k]) / span)) : 0;
+    o[i] = vs[k] + (vs[k + 1] - vs[k]) * u;
+  }
+  return o;
+}
+async function importFiles(files) {
+  let total = null, lin = null, grav = null, alt = null, own = null;
+  for (const file of files) {
+    const f = parseCSV(await file.text()), name = file.name.toLowerCase(), H = f.header;
+    const t = timeCol(H, f.cols);
+    if (!t) throw new Error(`${file.name}: keine Zeitspalte gefunden.`);
+    if (findAxis(H, 'x', 'f') >= 0) {
+      const fv = vecStream(f, 'f'), gv = vecStream(f, 'g'), ia = H.indexOf('alt');
+      own = { t, f: fv, g: gv, alt: ia >= 0 ? f.cols[ia] : null };
+      continue;
+    }
+    const ip = H.findIndex(h => /pressure|druck|hpa/.test(h)), ir = H.findIndex(h => /relativealtitude|altitude|höhe/.test(h));
+    if (/baro|pressure|druck/.test(name) || ip >= 0 || ir >= 0) {
+      if (ir >= 0) alt = { t, v: f.cols[ir] };
+      else if (ip >= 0) { const p0 = f.cols[ip][0]; alt = { t, v: f.cols[ip].map(p => 44330 * (1 - Math.pow(p / p0, 1 / 5.255))) }; }
+      continue;
+    }
+    const v = vecStream(f);
+    if (!v) throw new Error(`${file.name}: keine x/y/z-Spalten gefunden.`);
+    const m = median(v.x.slice(0, 2000).map((_, i) => Math.hypot(v.x[i], v.y[i], v.z[i])));
+    const scale = m > 0.5 && m < 1.5 && !/^accelerometer/.test(name) ? G : 1;
+    if (scale !== 1) { v.x = v.x.map(q => q * G); v.y = v.y.map(q => q * G); v.z = v.z.map(q => q * G); }
+    const s = { t, ...v };
+    if (/grav/.test(name)) grav = s;
+    else if (/total|with g|mit g/.test(name) || (m > 6 && m < 14)) total = s;
+    else lin = s;
+  }
+  let R;
+  if (own) {
+    R = { t: own.t, fx: own.f.x, fy: own.f.y, fz: own.f.z };
+    if (own.g) Object.assign(R, { gx: own.g.x, gy: own.g.y, gz: own.g.z });
+    if (own.alt) R.alt = own.alt;
+  } else {
+    const base = total || lin;
+    if (!base) throw new Error('Keine Beschleunigungsdaten gefunden. Wähle Accelerometer/TotalAcceleration und Gravity gemeinsam aus.');
+    const td = base.t;
+    R = { t: td };
+    let gx, gy, gz;
+    if (grav) { gx = interp(grav.t, grav.x, td); gy = interp(grav.t, grav.y, td); gz = interp(grav.t, grav.z, td); Object.assign(R, { gx, gy, gz }); }
+    if (total) Object.assign(R, { fx: total.x, fy: total.y, fz: total.z });
+    else if (grav) Object.assign(R, { fx: lin.x.map((q, i) => q + gx[i]), fy: lin.y.map((q, i) => q + gy[i]), fz: lin.z.map((q, i) => q + gz[i]) });
+    else throw new Error('Nur Beschleunigung ohne Schwerkraft gefunden. Lade zusätzlich Gravity.csv oder TotalAcceleration.csv.');
+    if (alt) R.alt = Array.from(interp(alt.t, alt.v, td));
+  }
+  const t0 = R.t[0]; R.t = R.t.map(x => x - t0);
+  return R;
+}
+
+/* ---------- Darstellung ---------- */
+let A = null;
+function run() {
+  A = analyze(rec);
+  jumps = A.jumps;
+  if (sel >= jumps.length) sel = -1;
+  render();
+}
+function render() {
+  const hs = jumps.map(j => j.h);
+  const best = hs.length ? Math.max(...hs) : null;
+  $('best').innerHTML = `${fmt(best)}<small>m</small>`;
+  $('sCount').textContent = jumps.length || '0';
+  $('sAvg').textContent = hs.length ? fmt(hs.reduce((a, b) => a + b, 0) / hs.length) : '–';
+  $('sAir').textContent = jumps.length ? fmt(Math.max(...jumps.map(j => j.T))) : '–';
+  const pill = $('srcPill');
+  pill.className = 'pill ' + source.kind;
+  pill.textContent = { demo: 'Beispieldaten', live: 'Live', file: 'Import' }[source.kind];
+  $('srcText').textContent = source.text;
+  $('lgBaro').hidden = !(rec && rec.alt);
+
+  const tb = $('rows');
+  tb.innerHTML = '';
+  if (!jumps.length) { tb.innerHTML = '<tr><td colspan="6" class="empty">Noch keine Sprünge erkannt. Auf dem Wasser zählt jeder Sprung ab der minimalen Airtime.</td></tr>'; }
+  jumps.forEach((j, i) => {
+    const tr = document.createElement('tr');
+    if (i === sel) tr.className = 'sel';
+    tr.tabIndex = 0;
+    const w = best ? Math.max(4, 90 * j.h / best) : 0;
+    tr.innerHTML = `<td class="num">${i + 1}</td><td class="num">${clock(j.t0)}</td><td class="r num">${fmt(j.T)} s</td>
+      <td class="num"><span class="hbar" style="width:${w}px"></span><b>${fmt(j.h)} m</b></td>
+      <td class="r num">${j.hBaro != null ? fmt(j.hBaro) + ' m' : '–'}</td><td>${j.method}</td>`;
+    const pick = () => { sel = sel === i ? -1 : i; render(); };
+    tr.onclick = pick; tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+    tb.appendChild(tr);
+  });
+  renderDetail();
+  draw();
+}
+function clock(s) { const m = Math.floor(s / 60), r = Math.floor(s % 60); return `${m}:${String(r).padStart(2, '0')}`; }
+function renderDetail() {
+  const d = $('detail');
+  if (sel < 0 || !jumps[sel]) { d.hidden = true; return; }
+  const j = jumps[sel];
+  d.hidden = false;
+  const cell = (v, l) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`;
+  d.innerHTML = [
+    cell(`${fmt(j.h)} m`, `Sprung ${sel + 1} · ${j.method}`),
+    cell(`${fmt(j.T, 2)} s`, 'Airtime'),
+    j.hInt != null ? cell(`${fmt(j.hKite)} m`, 'Schätzung Airtime + Kite-Zug') : '',
+    cell(`${fmt(j.hBall)} m`, 'Wurfparabel ohne Kite (Obergrenze)'),
+    j.hBaro != null ? cell(`${fmt(j.hBaro)} m`, 'Barometer') : '',
+    cell(`${fmt(j.fbar, 2)} g`, 'Kite-Zug in der Luft'),
+    cell(`${fmt(j.popPk, 1)} g`, 'Spitze beim Absprung'),
+    cell(`${fmt(j.landPk, 1)} g`, 'Spitze bei der Landung'),
+    j.rot != null ? cell(`${Math.round(j.rot / 10) * 10}°`, 'Rotation (Kippachse)') : ''
+  ].join('');
+}
+
+/* ---------- Chart ---------- */
+const cv = $('chart'), ctx = cv.getContext('2d');
+let view = null;
+function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function draw() {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const ink = css('--ink'), muted = css('--muted'), line = css('--line'), acc = css('--accent'), sea = css('--sea'), sky = css('--sky');
+  ctx.font = '11px ' + css('--f-mono');
+  if (!rec || !A || rec.t.length < 2) { ctx.fillStyle = muted; ctx.fillText('Keine Daten', 12, 20); return; }
+  const t = rec.t, n = t.length;
+  let x0 = t[0], x1 = t[n - 1];
+  if (sel >= 0 && jumps[sel]) { const j = jumps[sel]; x0 = Math.max(t[0], j.t0 - 3); x1 = Math.min(t[n - 1], j.t0 + j.T + 3); }
+  const L = 36, Rr = 8, top = 16, gH = 40, mid = H - gH - 36, bot = H - 18;
+  const maxH = Math.max(2, ...jumps.map(j => Math.max(j.h, j.hBaro || 0))) * 1.15;
+  const step = maxH > 12 ? 4 : maxH > 6 ? 2 : 1;
+  const X = v => L + (v - x0) / (x1 - x0) * (W - L - Rr);
+  const Y = z => mid - z / maxH * (mid - top);
+  view = { X, x0, x1, L, W, Rr };
+
+  // grid
+  ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.fillStyle = muted; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let z = 0; z <= maxH; z += step) { const y = Math.round(Y(z)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - Rr, y); ctx.stroke(); ctx.fillText(z + ' m', L - 6, y); }
+  // water
+  ctx.fillStyle = sky; ctx.fillRect(L, Y(0), W - L - Rr, 4);
+
+  const i0 = idxAt(t, x0), i1 = Math.min(n - 1, idxAt(t, x1));
+  const stride = Math.max(1, Math.floor((i1 - i0) / (W * 1.5)));
+  // baro
+  if (A.baro) {
+    const base = median(Array.from(A.baro.filter((_, i) => i % 25 === 0)));
+    ctx.fillStyle = sea; ctx.globalAlpha = 0.45;
+    for (let i = i0; i <= i1; i += stride * 2) { const z = A.baro[i] - base; if (z > -1 && z < maxH) ctx.fillRect(X(t[i]) - 1, Y(z) - 1, 2, 2); }
+    ctx.globalAlpha = 1;
+  }
+  // height trace with fill
+  ctx.beginPath(); ctx.moveTo(X(t[i0]), Y(0));
+  for (let i = i0; i <= i1; i += stride) ctx.lineTo(X(t[i]), Y(A.zAll[i]));
+  ctx.lineTo(X(t[i1]), Y(0)); ctx.closePath();
+  ctx.fillStyle = acc; ctx.globalAlpha = 0.14; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = acc; ctx.lineWidth = 2; ctx.stroke();
+  // labels
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '600 12px ' + css('--f-mono');
+  jumps.forEach((j, k) => {
+    const xm = X(j.t0 + j.T / 2); if (xm < L || xm > W - Rr) return;
+    ctx.fillStyle = k === sel ? acc : ink;
+    ctx.fillText(fmt(j.h) + ' m', xm, Y(j.h) - 4);
+  });
+  // felt g strip
+  const gy0 = bot - gH, gMax = 4;
+  const GY = g => bot - Math.min(g, gMax) / gMax * gH;
+  ctx.strokeStyle = line; ctx.beginPath(); ctx.moveTo(L, bot + 0.5); ctx.lineTo(W - Rr, bot + 0.5); ctx.stroke();
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = acc; ctx.globalAlpha = 0.6;
+  ctx.beginPath(); ctx.moveTo(L, GY(opts.thr)); ctx.lineTo(W - Rr, GY(opts.thr)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  ctx.strokeStyle = muted; ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = i0; i <= i1; i += stride) { const x = X(t[i]), y = GY(A.mag[i] / G); i === i0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.stroke();
+  ctx.font = '11px ' + css('--f-mono'); ctx.fillStyle = muted; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.fillText('1 g', L - 6, GY(1)); ctx.fillText('3 g', L - 6, GY(3));
+  // time axis
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const span = x1 - x0, pxPer = (W - L - Rr) / span, ts = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find(v => v * pxPer >= 48) || 1200;
+  for (let v = Math.ceil(x0 / ts) * ts; v <= x1; v += ts) ctx.fillText(span > 40 ? clock(v) : v.toFixed(0) + ' s', X(v), bot + 3);
+}
+cv.addEventListener('click', e => {
+  if (!view || !jumps.length) return;
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left;
+  let bestK = -1, bd = 40;
+  jumps.forEach((j, k) => { const d = Math.abs(view.X(j.t0 + j.T / 2) - x); if (d < bd) { bd = d; bestK = k; } });
+  sel = bestK === sel ? -1 : bestK; render();
+});
+new ResizeObserver(() => draw()).observe(cv);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* ---------- Bedienung ---------- */
+function msg(text, err) { const m = $('msg'); m.hidden = !text; m.textContent = text || ''; m.className = 'msg' + (err ? ' err' : ''); }
+function loadDemo() {
+  stopLive();
+  rec = makeDemo(); sel = -1;
+  source = { kind: 'demo', text: 'Synthetische Session, 80 s, 4 Sprünge. Importiere oder miss live für echte Werte.' };
+  msg(''); run();
+}
+$('btnDemo').onclick = loadDemo;
+$('fileIn').onchange = async e => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  try {
+    stopLive();
+    rec = await importFiles(files); sel = -1;
+    const dur = rec.t[rec.t.length - 1];
+    source = { kind: 'file', text: `${files.map(f => f.name).join(', ')} · ${clock(dur)} min${rec.gx ? '' : ' · ohne Lagedaten'}${rec.alt ? ' · mit Barometer' : ''}` };
+    msg(''); run();
+  } catch (err) { msg('Import fehlgeschlagen: ' + err.message, true); }
+  e.target.value = '';
+};
+['thr', 'minAir'].forEach(id => {
+  const el = $(id), out = $(id + 'V');
+  const upd = () => { opts[id] = parseFloat(el.value); out.textContent = id === 'thr' ? fmt(opts.thr, 2) + ' g' : fmt(opts.minAir) + ' s'; };
+  upd();
+  el.oninput = () => { upd(); if (rec) run(); };
+});
+
+/* ---------- Live ---------- */
+let live = null;
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity; if (!a || a.x == null) return;
+  const l = e.acceleration, now = performance.now() / 1000;
+  const R = live.rec;
+  if (!R.t.length) live.t0 = now;
+  R.t.push(now - live.t0); R.fx.push(a.x); R.fy.push(a.y); R.fz.push(a.z);
+  if (l && l.x != null) { R.gx.push(a.x - l.x); R.gy.push(a.y - l.y); R.gz.push(a.z - l.z); } else live.noGrav = true;
+  live.got = true;
+  const m = Math.hypot(a.x, a.y, a.z) / G;
+  live.ema = live.ema == null ? m : live.ema * 0.8 + m * 0.2;
+  if (live.ema < opts.thr) { if (live.airStart == null) live.airStart = now; } else live.airStart = null;
+}
+async function startLive() {
+  if (typeof DeviceMotionEvent === 'undefined') { msg('Dieses Gerät meldet keine Bewegungssensoren.', true); return; }
+  try {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const st = await DeviceMotionEvent.requestPermission();
+      if (st !== 'granted') { msg('Zugriff auf Bewegungssensoren abgelehnt. In Safari unter «Einstellungen für Websites» erlauben.', true); return; }
+    }
+  } catch (err) { msg('Sensorzugriff nicht möglich: ' + err.message, true); return; }
+  if ($('speak').checked && 'speechSynthesis' in window) { const u = new SpeechSynthesisUtterance('Aufnahme läuft'); u.lang = 'de-CH'; speechSynthesis.speak(u); }
+  rec = { t: [], fx: [], fy: [], fz: [], gx: [], gy: [], gz: [] };
+  live = { rec, got: false, ema: null, airStart: null, known: 0, noGrav: false };
+  source = { kind: 'live', text: 'Aufnahme läuft' };
+  jumps = []; sel = -1; A = analyze(rec); render();
+  window.addEventListener('devicemotion', onMotion);
+  try { live.lock = await navigator.wakeLock?.request('screen'); } catch (_) {}
+  $('livePanel').hidden = false; $('btnLive').disabled = true; msg('');
+  live.ui = setInterval(liveTick, 150);
+  live.an = setInterval(liveAnalyze, 1000);
+  setTimeout(() => {
+    if (live && !live.got) { stopLive(); msg('Keine Sensordaten empfangen. In der Claude-Vorschau sind Bewegungssensoren gesperrt. Öffne index.html über HTTPS auf dem Handy, oder importiere eine Aufzeichnung.', true); }
+  }, 2000);
+}
+function liveTick() {
+  if (!live) return;
+  const now = performance.now() / 1000;
+  const air = live.airStart != null && now - live.airStart > 0.15;
+  $('lState').textContent = air ? 'In der Luft' : 'Auf dem Wasser';
+  $('lState').className = 'state' + (air ? ' air' : '');
+  $('lG').textContent = fmt(live.ema ?? 1, 2) + ' g';
+  $('lAir').textContent = fmt(air ? now - live.airStart : 0) + ' s';
+}
+function liveAnalyze() {
+  if (!live || rec.t.length < 50) return;
+  if (live.noGrav) { delete rec.gx; delete rec.gy; delete rec.gz; }
+  run();
+  source.text = `Aufnahme läuft · ${clock(rec.t[rec.t.length - 1])}`; $('srcText').textContent = source.text;
+  if (jumps.length > live.known) {
+    const j = jumps[jumps.length - 1];
+    live.known = jumps.length;
+    $('lLast').textContent = fmt(j.h) + ' m';
+    if ($('speak').checked && 'speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(`${fmt(j.h).replace('.', ' Komma ')} Meter`); u.lang = 'de-CH'; speechSynthesis.speak(u);
+    }
+    navigator.vibrate?.(150);
+  }
+}
+function stopLive() {
+  if (!live) return;
+  window.removeEventListener('devicemotion', onMotion);
+  clearInterval(live.ui); clearInterval(live.an);
+  live.lock?.release?.().catch(() => {});
+  const had = live.got; live = null;
+  $('livePanel').hidden = true; $('btnLive').disabled = false;
+  if (had) { source.text = `Aufnahme beendet · ${clock(rec.t[rec.t.length - 1] || 0)}`; run(); }
+}
+$('btnLive').onclick = startLive;
+$('btnStop').onclick = stopLive;
+$('btnCsv').onclick = () => {
+  if (!rec || !rec.t.length) return;
+  const g = !!rec.gx;
+  let s = g ? 't,fx,fy,fz,gx,gy,gz\n' : 't,fx,fy,fz\n';
+  for (let i = 0; i < rec.t.length; i++) s += [rec.t[i].toFixed(3), rec.fx[i], rec.fy[i], rec.fz[i]].concat(g ? [rec.gx[i], rec.gy[i], rec.gz[i]] : []).map(v => typeof v === 'number' ? +v.toFixed(4) : v).join(',') + '\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([s], { type: 'text/csv' }));
+  a.download = `kite-session-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`;
+  a.click();
+};
+
+loadDemo();
+})();
+</script>
+
+</body></html>
